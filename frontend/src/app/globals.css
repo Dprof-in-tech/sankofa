@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #fafaf9;
+  --ink: #0a0a0a;
+  --muted: #525252;
+  --soft: #737373;
+  --hairline: #e7e5e4;
+  --card: #ffffff;
+  --accent-warn-bg: #fef3c7;
+  --accent-warn-ink: #78350f;
+  --accent-safe-bg: #dcfce7;
+  --accent-safe-ink: #14532d;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-soft: var(--soft);
+  --color-hairline: var(--hairline);
+  --color-card: var(--card);
+  --color-warn-bg: var(--accent-warn-bg);
+  --color-warn-ink: var(--accent-warn-ink);
+  --color-safe-bg: var(--accent-safe-bg);
+  --color-safe-ink: var(--accent-safe-ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html, body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+@keyframes sankofa-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.sankofa-pulse { animation: sankofa-pulse 1.6s ease-in-out infinite; }
+
+@keyframes sankofa-dot {
+  0%, 80%, 100% { transform: scale(0.4); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+.sankofa-dot { animation: sankofa-dot 1.2s ease-in-out infinite; }

@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TriggerType {
+  SIM_SWAP
+  DEVICE_SWAP
+  DEVICE_OFFLINE
+  MANUAL
+}
+
+enum ResponseTier {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id                  String   @id @default(cuid())
+  name                String
+  phoneE164           String   @unique
+  email               String
+  homeCenterLat       Float
+  homeCenterLng       Float
+  homeRadiusKm        Float    @default(5.0)
+  trustedContactName  String?
+  trustedContactEmail String?
+  walletFrozen        Boolean  @default(false)
+  createdAt           DateTime @default(now())
+
+  devices     Device[]
+  theftEvents TheftEvent[]
+}
+
+model Device {
+  id            String    @id @default(cuid())
+  imei          String    @unique
+  userId        String
+  currentSim    String
+  lastSeenLat   Float?
+  lastSeenLng   Float?
+  lastSeenAt    DateTime?
+  blacklisted   Boolean   @default(false)
+  saleInitiated Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theftEvents TheftEvent[]
+  activity    ActivityLog[]
+
+  @@index([userId])
+}
+
+model TheftEvent {
+  id        String       @id @default(cuid())
+  deviceId  String
+  userId    String
+  trigger   TriggerType
+  aiScore   Float
+  tier      ResponseTier
+  reasoning String
+  resolved  Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  deviceId  String
+  kind      String
+  message   String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, createdAt])
+}
