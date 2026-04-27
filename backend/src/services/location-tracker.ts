@@ -97,6 +97,11 @@ async function tick(eventId: string, args: StartTrackingArgs): Promise<void> {
     },
   });
 
+  await prisma.device.update({
+    where: { id: args.deviceId },
+    data: { lastSeenLat: loc.latitude, lastSeenLng: loc.longitude, lastSeenAt: new Date() },
+  });
+
   if (movedMeters >= MOVEMENT_EMAIL_METERS) {
     await sendMovementAlert({
       ownerName: args.owner.name,

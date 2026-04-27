@@ -1,7 +1,35 @@
 "use client";
 
 import type React from "react";
+import { useEffect, useState } from "react";
 import type { ActivityItem, Device, TheftEvent, Tier, User } from "@/lib/api";
+
+function useReverseGeocode(lat: number | null | undefined, lng: number | null | undefined): string | null {
+  const [place, setPlace] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (lat == null || lng == null) { setPlace(null); return; }
+    const controller = new AbortController();
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+      { signal: controller.signal, headers: { "Accept-Language": "en" } },
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        const a = data.address ?? {};
+        const parts = [
+          a.suburb ?? a.quarter ?? a.neighbourhood ?? a.village ?? a.road,
+          a.city ?? a.town ?? a.municipality ?? a.county,
+          a.country,
+        ].filter(Boolean) as string[];
+        setPlace(parts.slice(0, 2).join(", ") || data.display_name?.split(",")[0] || null);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [lat, lng]);
+
+  return place;
+}
 
 interface Props {
   user: User | null;
@@ -17,7 +45,7 @@ export function AdminConsole({ user, device, latestEvent, activity, location, wo
     ? "investigating"
     : latestEvent?.tier === "HIGH"
       ? "lockdown"
-      : latestEvent
+      : latestEvent?.tier === "MEDIUM"
         ? "investigating"
         : "calm";
 
@@ -66,6 +94,8 @@ function IdentityBlock({
   device: Device | null;
   location: { latitude: number; longitude: number } | null;
 }) {
+  const placeName = useReverseGeocode(location?.latitude, location?.longitude);
+
   return (
     <div className="px-6 py-5 grid grid-cols-2 gap-5">
       <Field label="Protected person" value={user?.name ?? "—"} sub={user?.phoneE164 ?? ""} />
@@ -89,7 +119,7 @@ function IdentityBlock({
       <Field
         label="Last known location"
         value={location ? `${location.latitude.toFixed(3)}, ${location.longitude.toFixed(3)}` : "—"}
-        sub={location ? "via CAMARA Location Retrieval" : "no event yet"}
+        sub={location ? (placeName ?? "via CAMARA Location Retrieval") : "no event yet"}
         mono
       />
     </div>

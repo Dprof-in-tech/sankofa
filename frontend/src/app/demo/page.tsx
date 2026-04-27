@@ -14,6 +14,7 @@ export default function DemoPage() {
   const [phoneState, setPhoneState] = useState<PhoneState>("idle");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoEmail, setDemoEmail] = useState("");
   const lockedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const latestEvent = events[0] ?? null;
@@ -38,13 +39,15 @@ export default function DemoPage() {
       setActivity(act);
       setError(null);
 
-      // Reflect backend state in the phone view at load time.
+      // Reflect backend state in the phone view at load time and on each poll.
       if (evs.length === 0) {
         setPhoneState("idle");
       } else if (evs[0].tier === "HIGH") {
         setPhoneState("locked");
-      } else {
+      } else if (evs[0].tier === "MEDIUM") {
         setPhoneState("alerting");
+      } else {
+        setPhoneState("idle");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not reach the backend.");
@@ -71,11 +74,11 @@ export default function DemoPage() {
     setWorking(true);
     setPhoneState("alerting");
     try {
-      const result = await api.triggerTheft(device.imei, "SIM_SWAP");
+      const result = await api.triggerTheft(device.imei, "SIM_SWAP", demoEmail || undefined);
       // Let the phone sit in "alerting" briefly so the transition feels real.
       if (lockedTimer.current) clearTimeout(lockedTimer.current);
       lockedTimer.current = setTimeout(() => {
-        setPhoneState(result.score.tier === "HIGH" ? "locked" : "alerting");
+        setPhoneState(result.score.tier === "HIGH" ? "locked" : result.score.tier === "MEDIUM" ? "alerting" : "idle");
       }, 1800);
       await refresh();
     } catch (e) {
@@ -93,6 +96,7 @@ export default function DemoPage() {
       await api.resetDemo();
       if (lockedTimer.current) clearTimeout(lockedTimer.current);
       setPhoneState("idle");
+      setDemoEmail("");
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Reset failed.");
@@ -109,10 +113,10 @@ export default function DemoPage() {
     setWorking(true);
     setPhoneState("alerting");
     try {
-      const result = await api.triggerTheft(device.imei, "MANUAL");
+      const result = await api.triggerTheft(device.imei, "MANUAL", demoEmail || undefined);
       if (lockedTimer.current) clearTimeout(lockedTimer.current);
       lockedTimer.current = setTimeout(() => {
-        setPhoneState(result.score.tier === "HIGH" ? "locked" : "alerting");
+        setPhoneState(result.score.tier === "HIGH" ? "locked" : result.score.tier === "MEDIUM" ? "alerting" : "idle");
       }, 1800);
       await refresh();
     } catch (e) {
@@ -122,6 +126,21 @@ export default function DemoPage() {
       setWorking(false);
     }
   }, [device, working, refresh]);
+
+  const onRegisterSale = useCallback(async () => {
+    if (!device || working) return;
+    setWorking(true);
+    try {
+      await api.markAsSold(device.imei);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Register sale failed.");
+    } finally {
+      setWorking(false);
+    }
+  }, [device, working, refresh]);
+
+  const activeTheftEvent = latestEvent && !latestEvent.resolved ? latestEvent : null;
 
   return (
     <main className="flex-1 flex flex-col">
@@ -149,6 +168,14 @@ export default function DemoPage() {
             Report stolen
           </button>
           <button
+            onClick={onRegisterSale}
+            disabled={!device || working || !!device?.saleInitiated || !!activeTheftEvent}
+            title="Mark device as being legitimately sold — next theft trigger should score LOW."
+            className="h-10 rounded-full border border-hairline bg-card px-4 text-sm text-ink hover:bg-paper transition-colors disabled:opacity-40"
+          >
+            {device?.saleInitiated ? "Sale registered" : "Register sale"}
+          </button>
+          <button
             onClick={onSimulate}
             disabled={!device || working}
             className="h-10 rounded-full bg-ink px-5 text-sm text-paper font-medium hover:opacity-85 transition-opacity disabled:opacity-40"
@@ -171,6 +198,33 @@ export default function DemoPage() {
             a carrier operator would see. Press <span className="text-ink">Simulate theft</span> to
             trigger the real CAMARA pipeline.
           </p>
+          <div className="mt-5 grid grid-cols-2 gap-3 max-w-lg">
+            <div className="rounded-xl border border-hairline bg-card px-4 py-3">
+              <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-soft mb-1.5">Scenario A</p>
+              <p className="text-sm font-medium text-ink">Genuine theft</p>
+              <p className="text-xs text-muted mt-1 leading-relaxed">Simulate theft → AI scores HIGH → wallet frozen, IMEI blacklisted.</p>
+            </div>
+            <div className={`rounded-xl border px-4 py-3 transition-colors ${device?.saleInitiated ? "border-hairline bg-safe-bg" : "border-hairline bg-card"}`}>
+              <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-soft mb-1.5">Scenario B</p>
+              <p className="text-sm font-medium text-ink">False positive suppressed</p>
+              <p className="text-xs text-muted mt-1 leading-relaxed">Register sale → Simulate theft → AI scores LOW → no freeze.</p>
+              {device?.saleInitiated && (
+                <p className="text-xs font-medium text-safe-ink mt-1.5">Sale registered</p>
+              )}
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col items-start gap-3">
+            <span className="font-mono text-[10px] tracking-[0.2em] uppercase text-soft shrink-0">
+              Receive alerts
+            </span>
+            <input
+              type="email"
+              value={demoEmail}
+              onChange={(e) => setDemoEmail(e.target.value)}
+              placeholder="Enter your email to receive the alerts we send"
+              className="h-8.5 w-85 rounded-lg border border-hairline bg-card px-3 py-2 text-sm text-ink placeholder:text-soft focus:outline-none focus:ring-1 focus:ring-ink"
+            />
+          </div>
         </div>
       </div>
 

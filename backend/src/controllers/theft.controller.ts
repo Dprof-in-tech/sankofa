@@ -22,13 +22,29 @@ function kmBetween(aLat: number, aLng: number, bLat: number, bLng: number): numb
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+// Known high-crime areas in Lagos — in production these feed from ACLED API or equivalent live crime data.
+// Coordinates verified against latitude.to and findlatitudeandlongitude.com (Apr 2026).
+const LAGOS_HOTZONES = [
+  { lat: 6.5000, lng: 3.4008, radiusKm: 2.0 }, // Third Mainland Bridge
+  { lat: 6.5142, lng: 3.3087, radiusKm: 1.5 }, // Oshodi
+  { lat: 6.6122, lng: 3.4019, radiusKm: 1.5 }, // Mile 12
+  { lat: 6.5333, lng: 3.3500, radiusKm: 1.5 }, // Mushin
+  { lat: 6.6198, lng: 3.3222, radiusKm: 1.5 }, // Agege
+  { lat: 6.5317, lng: 3.3998, radiusKm: 1.5 }, // Bariga
+];
+
+function isInTheftHotzone(lat: number, lng: number): boolean {
+  return LAGOS_HOTZONES.some((z) => kmBetween(lat, lng, z.lat, z.lng) <= z.radiusKm);
+}
+
 /**
  * Simulate / ingest a theft trigger. This is what the demo dashboard fires
  * when the judge clicks "Simulate snatching."
  */
 export async function triggerTheft(req: Request, res: Response) {
-  const body = (req.body ?? {}) as { imei?: string; trigger?: TriggerType };
-  const { imei, trigger } = body;
+  const body = (req.body ?? {}) as { imei?: string; trigger?: TriggerType; demoEmail?: string };
+  const { imei, trigger, demoEmail: rawDemoEmail } = body;
+  const demoEmail = rawDemoEmail?.trim() || undefined;
   if (!imei || !trigger) return res.status(400).json({ error: 'imei and trigger required' });
 
   const device = await prisma.device.findUnique({
@@ -40,9 +56,9 @@ export async function triggerTheft(req: Request, res: Response) {
   // Fan out to CAMARA in parallel — location + reachability + swap verifications.
   // Any one failing shouldn't block scoring; log and treat as unknown.
   const phone = device.user.phoneE164;
-  const [location, reachability, simSwap, deviceSwap] = await Promise.all([
-    getLocation(phone),
-    checkReachability(phone),
+  const [locationRaw, reachabilityRaw, simSwap, deviceSwap] = await Promise.all([
+    getLocation(phone).catch((e) => { console.error('[camara] location failed', e); return null; }),
+    checkReachability(phone).catch((e) => { console.error('[camara] reachability failed', e); return null; }),
     checkSimSwap(phone).catch((e) => {
       console.error('[camara] simSwap failed', e);
       return null;
@@ -53,6 +69,22 @@ export async function triggerTheft(req: Request, res: Response) {
     }),
   ]);
 
+  // Fall back to home coordinates if CAMARA location is unavailable so the
+  // rest of the pipeline can continue — location-dependent signals are omitted
+  // from the score so we don't artificially bias it toward "safe".
+  const location = locationRaw ?? {
+    latitude: device.user.homeCenterLat,
+    longitude: device.user.homeCenterLng,
+    accuracyMeters: 0,
+  };
+
+  if (locationRaw) {
+    await prisma.device.update({
+      where: { id: device.id },
+      data: { lastSeenLat: locationRaw.latitude, lastSeenLng: locationRaw.longitude, lastSeenAt: new Date() },
+    });
+  }
+
   const distanceKm = kmBetween(
     device.user.homeCenterLat,
     device.user.homeCenterLng,
@@ -62,11 +94,13 @@ export async function triggerTheft(req: Request, res: Response) {
 
   const signals: Parameters<typeof scoreTheft>[0]['signals'] = {
     eventTime: new Date().toISOString(),
-    eventLat: location.latitude,
-    eventLng: location.longitude,
-    distanceFromHomeKm: Number(distanceKm.toFixed(2)),
-    areaTheftCluster: false,
-    reachable: reachability.reachable,
+    ...(locationRaw ? {
+      eventLat: location.latitude,
+      eventLng: location.longitude,
+      distanceFromHomeKm: Number(distanceKm.toFixed(2)),
+      areaTheftCluster: isInTheftHotzone(location.latitude, location.longitude),
+    } : { areaTheftCluster: false }),
+    ...(reachabilityRaw ? { reachable: reachabilityRaw.reachable } : {}),
   };
   if (simSwap) signals.simSwappedRecently = simSwap.swapped;
   if (deviceSwap) signals.deviceSwappedRecently = deviceSwap.swapped;
@@ -154,8 +188,8 @@ export async function triggerTheft(req: Request, res: Response) {
       message: `Trigger: ${trigger} · Score: ${score.score.toFixed(2)} · Tier: ${score.tier}`,
       meta: {
         reasoning: score.reasoning,
-        location: { ...location },
-        reachable: reachability.reachable,
+        location: locationRaw ? { ...location } : null,
+        reachable: reachabilityRaw?.reachable ?? null,
       },
     },
   });
@@ -176,11 +210,12 @@ export async function triggerTheft(req: Request, res: Response) {
   // Email notifications for MEDIUM / HIGH tiers — owner always, trusted if set.
   // Kemi can read the owner email from any borrowed device; Tunde gets a heads-up.
   if (score.tier !== 'LOW') {
+    const alertEmail = demoEmail ?? device.user.email;
     const emailResult = await sendTheftAlerts({
       ownerName: device.user.name,
-      ownerEmail: device.user.email,
-      trustedContactName: device.user.trustedContactName,
-      trustedContactEmail: device.user.trustedContactEmail,
+      ownerEmail: alertEmail,
+      trustedContactName: demoEmail ? null : device.user.trustedContactName,
+      trustedContactEmail: demoEmail ? null : device.user.trustedContactEmail,
       tier: score.tier,
       reasoning: score.reasoning,
       trigger,
@@ -193,7 +228,7 @@ export async function triggerTheft(req: Request, res: Response) {
     });
 
     const parts: string[] = [];
-    if (emailResult.ownerSent) parts.push(`owner (${device.user.email})`);
+    if (emailResult.ownerSent) parts.push(`owner (${alertEmail})`);
     if (emailResult.trustedSent && device.user.trustedContactEmail)
       parts.push(`trusted contact (${device.user.trustedContactEmail})`);
 
@@ -216,11 +251,8 @@ export async function triggerTheft(req: Request, res: Response) {
       phone: device.user.phoneE164,
       initialLat: location.latitude,
       initialLng: location.longitude,
-      owner: { name: device.user.name, email: device.user.email },
-      trusted: {
-        name: device.user.trustedContactName,
-        email: device.user.trustedContactEmail,
-      },
+      owner: { name: device.user.name, email: demoEmail ?? device.user.email },
+      ...(demoEmail ? {} : { trusted: { name: device.user.trustedContactName, email: device.user.trustedContactEmail } }),
       tier: score.tier,
       trigger,
     });

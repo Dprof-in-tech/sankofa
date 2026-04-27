@@ -73,12 +73,12 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  triggerTheft: (imei: string, trigger: TriggerType = "SIM_SWAP") =>
+  triggerTheft: (imei: string, trigger: TriggerType = "SIM_SWAP", demoEmail?: string) =>
     // Accepts SIM_SWAP / DEVICE_SWAP / DEVICE_OFFLINE / MANUAL — MANUAL is what
     // the "I've lost my phone" button sends when the thief hasn't swapped yet.
     call<TriggerResult>("/theft/trigger", {
       method: "POST",
-      body: JSON.stringify({ imei, trigger }),
+      body: JSON.stringify({ imei, trigger, ...(demoEmail ? { demoEmail } : {}) }),
     }),
   listEvents: () => call<TheftEvent[]>("/events"),
   listActivity: (deviceId?: string) =>
