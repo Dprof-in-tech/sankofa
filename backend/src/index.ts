@@ -18,6 +18,8 @@ const allowlist = new Set<string>([
   'http://localhost:3000',
   'http://localhost:3001',
   'https://imposed-sticky-insured-satin.trycloudflare.com',
+  'https://sankofa.myludus.me',
+  'https://sankofa-psi.vercel.app',
   ...extraOrigins,
 ]);
 app.use(
