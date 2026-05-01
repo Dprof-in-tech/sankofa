@@ -32,6 +32,7 @@ export interface TheftEmailInput {
   location: { latitude: number; longitude: number };
   occurredAt: Date;
   eventId: string;
+  resolveToken?: string;
 }
 
 // Undo links go through the frontend's /api rewrite so the email opens on
@@ -42,6 +43,10 @@ const PUBLIC_APP_URL = process.env.PUBLIC_APP_URL || 'http://localhost:3000';
 
 function resolveUrl(eventId: string): string {
   return `${PUBLIC_APP_URL}/api/theft/${eventId}/resolve`;
+}
+
+function trustedConfirmUrl(eventId: string, token: string): string {
+  return `${PUBLIC_APP_URL}/api/theft/${eventId}/trusted-confirm?token=${token}`;
 }
 
 export interface SendResult {
@@ -138,10 +143,19 @@ function ownerHtml(r: RenderInput): string {
     r.tier === 'HIGH'
       ? `Your phone may have been stolen, ${r.ownerFirst}.`
       : `We noticed something, ${r.ownerFirst}.`;
+
   const actionLine =
     r.tier === 'HIGH'
-      ? `We've already frozen your wallet and blacklisted the phone across every network. Your money is safe. No one can resell or reuse this device.`
-      : `This might be you — if you just swapped your SIM or got a new phone, no action is needed. Otherwise, please confirm so we can protect your wallet.`;
+      ? `We've already frozen your wallet and blacklisted the phone. Your money is safe. To undo this, your trusted contact must confirm it was a false alarm — we've sent them a separate link. This means even if the thief has your unlocked phone, they cannot undo the protection.`
+      : `This might be you — if you just swapped your SIM or got a new phone, enter your Sankofa resolve PIN to undo the alert immediately.`;
+
+  const actionButtons =
+    r.tier === 'HIGH'
+      ? `<a href="${r.mapsUrl}" style="display:inline-block;background:#0a0a0a;color:#fafaf9;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;">See live location</a>`
+      : `<table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+          <td style="padding-right:8px;"><a href="${r.mapsUrl}" style="display:inline-block;background:#0a0a0a;color:#fafaf9;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;">See live location</a></td>
+          <td><a href="${r.undoUrl}" style="display:inline-block;background:#ffffff;color:#0a0a0a;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;border:1px solid #e7e5e4;">Enter PIN to undo →</a></td>
+        </tr></table>`;
 
   return wrap(`
     <h1 style="font-size:28px;line-height:1.15;font-weight:600;margin:0 0 18px;letter-spacing:-0.02em;">${headline}</h1>
@@ -159,26 +173,49 @@ function ownerHtml(r: RenderInput): string {
       <div><span style="color:#737373;">Detected at:</span> ${r.when}</div>
     </div>
 
-    <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
-      <td style="padding-right:8px;"><a href="${r.mapsUrl}" style="display:inline-block;background:#0a0a0a;color:#fafaf9;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;">See live location</a></td>
-      <td><a href="${r.undoUrl}" style="display:inline-block;background:#ffffff;color:#0a0a0a;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;border:1px solid #e7e5e4;">This was me — undo</a></td>
-    </tr></table>
+    ${actionButtons}
   `);
 }
 
 function trustedHtml(r: RenderInput): string {
+  const confirmButton =
+    r.tier === 'HIGH' && r.resolveToken
+      ? `<p style="font-size:15px;line-height:1.65;color:#525252;margin:24px 0 8px;">If ${r.ownerFirst} tells you this was a false alarm — they bought a new phone or swapped SIMs legitimately — click below to undo all protections. Only you can do this. The thief cannot reach your inbox.</p>
+         <table role="presentation" cellspacing="0" cellpadding="0" border="0"><tr>
+           <td style="padding-right:8px;"><a href="${r.mapsUrl}" style="display:inline-block;background:#0a0a0a;color:#fafaf9;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;">See live location</a></td>
+           <td><a href="${trustedConfirmUrl(r.eventId, r.resolveToken)}" style="display:inline-block;background:#ffffff;color:#0a0a0a;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;border:1px solid #e7e5e4;">Confirm false alarm — undo all →</a></td>
+         </tr></table>`
+      : `<a href="${r.mapsUrl}" style="display:inline-block;background:#0a0a0a;color:#fafaf9;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;">See live location</a>`;
+
   return wrap(`
     <h1 style="font-size:26px;line-height:1.2;font-weight:600;margin:0 0 18px;letter-spacing:-0.02em;">${r.ownerFirst}'s phone may have just been stolen.</h1>
     <p style="font-size:16px;line-height:1.65;color:#525252;margin:0 0 18px;">You're listed as ${r.ownerFirst}'s trusted recovery contact on Sankofa. At ${r.when}, we detected ${r.triggerLabel} on their line.</p>
-    <p style="font-size:16px;line-height:1.65;color:#525252;margin:0 0 24px;">${r.ownerFirst} may try to reach you from an unfamiliar number. Please pick up — their wallet is safe and their phone is locked on every carrier, but they may need help getting home or contacting the police.</p>
+    <p style="font-size:16px;line-height:1.65;color:#525252;margin:0 0 24px;">${r.ownerFirst} may try to reach you from an unfamiliar number. Please pick up — their wallet is frozen and their phone is locked, but they may need help getting home or contacting the police.</p>
 
     <div style="background:#ffffff;border:1px solid #e7e5e4;border-radius:14px;padding:18px 22px;margin:0 0 24px;font-size:14px;line-height:1.7;color:#525252;">
       <div><span style="color:#737373;">Last known location:</span> <a href="${r.mapsUrl}" style="color:#0a0a0a;text-decoration:underline;">${r.location.latitude.toFixed(4)}, ${r.location.longitude.toFixed(4)}</a></div>
       <div><span style="color:#737373;">Detected at:</span> ${r.when}</div>
     </div>
 
-    <a href="${r.mapsUrl}" style="display:inline-block;background:#0a0a0a;color:#fafaf9;text-decoration:none;padding:14px 22px;border-radius:999px;font-weight:500;font-size:14px;">See live location</a>
+    ${confirmButton}
   `);
+}
+
+/**
+ * Lightweight send for the recovery agent — no template fields required.
+ * The agent composes its own message; this just wraps it in the standard
+ * Sankofa email chrome and fires it through Resend.
+ */
+export async function sendAgentEmail(
+  to: string,
+  subject: string,
+  bodyHtml: string,
+): Promise<boolean> {
+  if (!resend) return false;
+  const result = await resend.emails
+    .send({ from: FROM, to, subject, html: wrap(bodyHtml) })
+    .catch((e: unknown) => { console.error('[email] sendAgentEmail failed:', e); return null; });
+  return !!result;
 }
 
 function escapeHtml(s: string): string {

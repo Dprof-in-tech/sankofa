@@ -105,6 +105,90 @@ export async function checkReachability(phone: string): Promise<ReachabilityResu
   return { reachable: connectivity !== 'NOT_CONNECTED' };
 }
 
+// ── Device Offline Subscription ─────────────────────────────────────────────
+
+const CONNECTIVITY_DISCONNECTED = 'org.camaraproject.device-status.v0.connectivity-disconnected';
+
+/**
+ * Subscribe to a CAMARA device-offline event for the given phone. The carrier
+ * fires a webhook to `webhookUrl` when the device drops off the network (SIM
+ * removed or device powered off). Subscription expires after 24 hours.
+ *
+ * Returns the subscription ID — store it on TheftEvent.camaraSubscriptionId so
+ * it can be cleaned up when the event resolves.
+ */
+export async function subscribeToDeviceOffline(
+  phone: string,
+  webhookUrl: string,
+  authToken: string,
+): Promise<string> {
+  const d = await device(phone);
+  const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const subscription = await client.deviceStatus.subscribe(
+    d,
+    CONNECTIVITY_DISCONNECTED,
+    webhookUrl,
+    { notificationAuthToken: authToken, subscriptionExpireTime: expiry },
+  );
+  return subscription.eventSubscriptionId;
+}
+
+/**
+ * Delete a device-status subscription by ID. Call when the event resolves or
+ * when the device goes offline (subscription has served its purpose).
+ */
+export async function deleteDeviceSubscription(subscriptionId: string): Promise<void> {
+  const subscription = await client.deviceStatus.get(subscriptionId);
+  await subscription.delete();
+}
+
+// ── Roaming / Home Zone ──────────────────────────────────────────────────────
+
+export interface HomeZoneResult {
+  onHomeNetwork: boolean;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  roamingCountry?: string | null;
+}
+
+/**
+ * Network-native home zone detection.
+ *
+ * If the device is on its home network (not roaming), its current cell-tower
+ * position is recorded as the home area — no user input required. This is the
+ * production path when Sankofa runs inside a carrier: the network already
+ * knows where a subscriber's home zone is from registration-time location.
+ *
+ * If the device is roaming, we return the country it's visiting so the
+ * onboarding flow can ask the user to set home manually instead.
+ *
+ * Roaming subscription events (ROAMING_OFF) can also be used to
+ * automatically update the home zone when the device returns home.
+ */
+export async function detectHomeZone(phone: string): Promise<HomeZoneResult> {
+  const d = await device(phone);
+  const roaming = await d.getRoaming();
+
+  if (roaming.roaming) {
+    return {
+      onHomeNetwork: false,
+      roamingCountry: roaming.countryName?.[0] ?? null,
+    };
+  }
+
+  // On home network — current location is the home zone.
+  const loc = await d.getLocation(300).catch(() => null);
+  return {
+    onHomeNetwork: true,
+    ...(loc ? {
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      accuracyMeters: loc.radius ?? 0,
+    } : {}),
+  };
+}
+
 // ── Identity Assurance ───────────────────────────────────────────────────────
 
 export interface NumberVerificationResult {

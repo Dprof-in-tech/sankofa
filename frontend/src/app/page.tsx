@@ -34,10 +34,16 @@ export default function Home() {
 
           <div className="mt-12 flex flex-col sm:flex-row gap-3">
             <Link
-              href="/demo"
+              href="/onboard"
               className="inline-flex h-14 items-center justify-center rounded-full bg-ink px-8 text-paper text-base font-medium tracking-tight hover:opacity-85 transition-opacity"
             >
-              See it happen →
+              Get protected →
+            </Link>
+            <Link
+              href="/demo"
+              className="inline-flex h-14 items-center justify-center rounded-full border border-hairline bg-card px-8 text-ink text-base font-medium tracking-tight hover:bg-paper transition-colors"
+            >
+              See it happen
             </Link>
             <Link
               href="/how-it-works"
@@ -46,6 +52,7 @@ export default function Home() {
               How it works
             </Link>
           </div>
+
         </div>
       </section>
 
@@ -60,3 +67,4 @@ export default function Home() {
     </main>
   );
 }
+

@@ -3,12 +3,16 @@
  * Run after `npm run db:push` with `npm run db:seed`.
  */
 import 'dotenv/config';
+import { hash } from 'bcryptjs';
 import { PrismaClient } from '../src/generated/prisma/index.js';
 import { PrismaPg } from '@prisma/adapter-pg';
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('DATABASE_URL is not set');
 const prisma = new PrismaClient({ adapter: new PrismaPg(url) });
+
+// Demo resolve PIN — "123456". In production the user sets this at onboarding.
+const DEMO_PIN = '123456';
 
 async function main() {
   // Yaba, Lagos — Kemi's home neighborhood.
@@ -19,9 +23,11 @@ async function main() {
   const ownerEmail = process.env.DEMO_OWNER_EMAIL || 'amaechiisaac450@gmail.com';
   const trustedEmail = process.env.DEMO_TRUSTED_EMAIL || 'amaechiisaac450@gmail.com';
 
+  const resolvePinHash = await hash(DEMO_PIN, 10);
+
   const kemi = await prisma.user.upsert({
     where: { phoneE164: '+99999991000' },
-    update: { email: ownerEmail, trustedContactEmail: trustedEmail },
+    update: { email: ownerEmail, trustedContactEmail: trustedEmail, resolvePinHash },
     create: {
       name: 'Kemi Adeyemi',
       phoneE164: '+99999991000',
@@ -31,6 +37,7 @@ async function main() {
       homeRadiusKm: 4.0,
       trustedContactName: 'Tunde (husband)',
       trustedContactEmail: trustedEmail,
+      resolvePinHash,
     },
   });
 
@@ -48,7 +55,7 @@ async function main() {
   });
 
   console.log('Seeded:');
-  console.log('  user  :', kemi.id, kemi.name, kemi.phoneE164);
+  console.log('  user  :', kemi.id, kemi.name, kemi.phoneE164, '· resolve PIN:', DEMO_PIN);
   console.log('  device:', device.id, device.imei);
   console.log('\nSmoke test the pipeline:');
   console.log(`  curl -X POST http://localhost:3001/theft/trigger \\`);

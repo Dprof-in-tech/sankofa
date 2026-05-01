@@ -1,0 +1,485 @@
+{
+  "meta": {
+    "projectTitle": "Sankofa",
+    "tagline": "A phone the network has disowned is worth nothing to anyone.",
+    "subtitle": "Network-Level Phone Theft & Financial Fraud Shield",
+    "submissionIdea": "Sankofa — Network-Level Phone Theft & Fraud Shield",
+    "hackathon": "Africa Ignite Hackathon",
+    "team": "Team Kemi's Protectors",
+    "themes": {
+      "primary": "Theme 1 — Financial Inclusion, Secure Payments & Anti-Fraud",
+      "secondary": "Theme 3 — Health Access, Emergency Response & Community Safety",
+      "tertiary": "Theme 6 — Open Innovation"
+    },
+    "builtOn": "Nokia Network-as-Code · CAMARA APIs",
+    "geographies": ["Lagos", "Accra", "Nairobi", "Kigali", "Johannesburg"]
+  },
+
+  "problem": {
+    "headline": "The phone is the least valuable thing a thief steals.",
+    "realThreat": "What the thief can do in the next five minutes is the real attack: drain your Opay wallet, intercept your bank OTPs, and empty every account you've ever logged into on that device.",
+
+    "context": {
+      "mobileMoneyAsInfrastructure": "In Sub-Saharan Africa, mobile money is not a convenience — it is infrastructure. MTN MoMo, Opay, M-Pesa, and Airtel Money are how hundreds of millions of people pay rent, buy food, and send money home. A stolen phone is a stolen wallet.",
+      "scale": "400 million mobile money users in Sub-Saharan Africa have no dedicated theft-response system today.",
+      "attackWindow": "A thief has 5 minutes from snatching the phone before the victim can borrow another device, call their carrier, and begin any manual response. Sankofa operates in those 5 minutes.",
+      "phoneResetDefeat": "Every existing solution — Find My iPhone, Google Find My Device — is defeated by a factory reset that takes 90 seconds. A thief who knows this does not fear a tracking app. They should fear the network."
+    },
+
+    "whyExistingSolutionsFail": [
+      {
+        "solution": "Find My iPhone / Google Find My Device",
+        "failure": "App-based. Factory reset removes the app. Network connectivity required. Protects the device, not your finances."
+      },
+      {
+        "solution": "Call your carrier manually",
+        "failure": "Takes 30–60 minutes minimum. Long hold times. Thief has already accessed your accounts."
+      },
+      {
+        "solution": "Bank fraud hotlines",
+        "failure": "Reactive, not proactive. You must know which accounts are at risk and call each separately. Thief moves faster."
+      },
+      {
+        "solution": "Screen locks and PINs",
+        "failure": "Social engineering, shoulder-surfing, or hardware brute-force defeats them. And OTPs still arrive on the stolen number."
+      }
+    ],
+
+    "theSingleGap": "No system today operates at the network layer to detect theft and protect finances automatically — before the victim even has access to another device.",
+
+    "kemiScenario": {
+      "name": "Kemi Adeyemi",
+      "location": "Third Mainland Bridge, Lagos",
+      "time": "7:00 PM",
+      "incident": "A boy on a motorcycle snatches Kemi's phone and disappears into traffic.",
+      "immediateRisk": [
+        "Her Opay wallet — primary account, all daily spending money",
+        "Her MTN MoMo — family transfers",
+        "Her bank OTPs — arriving on the stolen number, the thief can authorise transactions",
+        "Every app she's ever logged into on that device"
+      ],
+      "kemisPosition": "She has no phone. She cannot call her bank. She cannot log into her carrier portal. She cannot reach her husband. She is on a bridge. She has five minutes."
+    }
+  },
+
+  "solution": {
+    "oneSentence": "Sankofa watches your phone at the carrier level — not on the device — so it acts before the thief does.",
+    "principle": "We live inside the network, not on the phone. A factory reset cannot touch us.",
+    "twoOfferings": {
+      "networkActive": {
+        "name": "Network-Active Protection",
+        "condition": "While the device is still connected to any carrier tower",
+        "capabilities": [
+          "Real-time SIM swap detection via CAMARA",
+          "Device swap detection (new SIM in known IMEI)",
+          "Cell-tower location tracking (300m accuracy in Lagos)",
+          "Device reachability monitoring",
+          "Push notification when device goes offline"
+        ]
+      },
+      "financialOnly": {
+        "name": "Financial Protection Mode",
+        "condition": "After the device drops off the network (SIM removed, factory reset, phone destroyed)",
+        "capabilities": [
+          "Wallet freeze signal already sent — cannot be undone by thief",
+          "IMEI registered in Sankofa's stolen device registry — kills resale market",
+          "Owner and trusted contact already alerted with last known location",
+          "Trusted contact is the sole authority to lift protections — thief cannot reach their inbox"
+        ],
+        "keyInsight": "The device is gone. But the money does not have to be. Finance protection is independent of device connectivity."
+      }
+    },
+
+    "sixtySecondResponse": [
+      {
+        "step": 1,
+        "time": "T+0s",
+        "title": "The network notices before Kemi does",
+        "detail": "Within seconds of the SIM swap, Kemi's carrier logs the event. Sankofa is subscribed to this signal at the network layer via Nokia's CAMARA APIs. No app needs to be open. No Wi-Fi required. The carrier is our sensor.",
+        "apis": ["SIM Swap Detection (verifySimSwap)"]
+      },
+      {
+        "step": 2,
+        "time": "T+3s",
+        "title": "Cross-signal verification — eliminating false alarms",
+        "detail": "A SIM swap alone isn't proof of theft. Sankofa asks the network two independent questions in parallel: did the SIM change, and did the physical device change? If a partner retailer already signalled a sale was in progress, the score drops immediately. Two signals, no sale — that is theft.",
+        "apis": ["SIM Swap Detection (verifySimSwap)", "Device Swap Detection (verifyDeviceSwap)", "Sale-initiated webhook"]
+      },
+      {
+        "step": 3,
+        "time": "T+8s",
+        "title": "Track the phone while it is still on the network",
+        "detail": "While the device is connected, Sankofa pulls live location from the carrier via CAMARA Location Retrieval and confirms reachability. Cell-tower triangulation puts us within 300 metres in dense Lagos. This window is short. We use every second.",
+        "apis": ["Location Retrieval (getLocation)", "Device Reachability (getConnectivity)"]
+      },
+      {
+        "step": 4,
+        "time": "T+10s",
+        "title": "The AI decides — and explains itself",
+        "detail": "Every signal feeds into Sankofa's Claude Sonnet 4.6-powered agentic scoring engine: distance from home, time of day, swap verification results, reachability status, hours since last activity, and whether the location is a known theft hotzone. It returns a confidence score from 0 to 1 and a plain-English explanation visible on the operator dashboard. No black box.",
+        "signals": [
+          "Distance from home neighbourhood",
+          "Time of day vs. normal activity window",
+          "SIM swap confirmed (yes/no)",
+          "Device swap confirmed (yes/no)",
+          "Device reachability",
+          "Hours since last network activity",
+          "Known theft hotzone (Lagos ACLED data)"
+        ],
+        "technology": "Claude Sonnet 4.6 via Vercel AI SDK — agentic tool-calling loop with explainable output"
+      },
+      {
+        "step": 5,
+        "time": "T+12s",
+        "title": "Tiered response — proportional to confidence",
+        "tiers": [
+          {
+            "tier": "LOW",
+            "confidence": "< 0.4",
+            "response": "Silent push notification to owner. No freeze. No lockdown."
+          },
+          {
+            "tier": "MEDIUM",
+            "confidence": "0.4 – 0.75",
+            "response": "Alert to owner and trusted contact. Location tracking begins. Owner can resolve with their pre-set 6-digit PIN from any borrowed device."
+          },
+          {
+            "tier": "HIGH",
+            "confidence": "> 0.75",
+            "response": "Wallet freeze. IMEI blacklisted. Trusted contact alerted with a one-time secure confirm link. Only the trusted contact can lift protections — even the thief with the unlocked phone cannot reach their inbox."
+          }
+        ]
+      },
+      {
+        "step": 6,
+        "time": "T+15s",
+        "title": "Freeze the money before the thief moves it",
+        "detail": "At HIGH confidence, Sankofa fires a freeze signal to the mobile money provider. The thief can hold the phone all night. They cannot move a single naira.",
+        "currentState": "Mock webhook (demo). Production requires direct MoMo provider API agreements.",
+        "impact": "This is the protection that matters most. The hardware is already gone."
+      },
+      {
+        "step": 7,
+        "time": "T+20s",
+        "title": "Alert Kemi from any device",
+        "detail": "Kemi doesn't have her phone — so Sankofa emails her. From any borrowed device, internet cafe, or family member's laptop, she sees what happened, where the phone last was, and what's been locked. Her trusted contact gets a separate alert and becomes the sole authority to confirm a false alarm.",
+        "security": "HIGH-tier trusted contact email contains a cryptographically signed one-time token. The thief cannot forge it. The thief cannot access the trusted contact's inbox. This is the resolve chain the thief cannot break."
+      },
+      {
+        "step": 8,
+        "time": "T+25s",
+        "title": "Device drops offline — finance-only mode activates",
+        "detail": "When the thief removes the SIM or resets the phone, Sankofa's CAMARA device-offline subscription fires. Location tracking ends. A final swap state check runs. The dashboard logs the transition to finance-only mode. The wallet freeze and IMEI flag remain active.",
+        "apis": ["Device Status Subscription (CONNECTIVITY_DISCONNECTED)"]
+      },
+      {
+        "step": 9,
+        "time": "T+30s",
+        "title": "IMEI registered as stolen — kill the resale market",
+        "detail": "Sankofa registers Kemi's IMEI in its stolen device registry. Partner vendors, second-hand dealers, and carrier agents who check before activating a handset will see it flagged. A phone that cannot be resold is not worth stealing.",
+        "currentState": "Sankofa registry (live). Network-level block requires MNO partnership (see: What's Next)."
+      }
+    ]
+  },
+
+  "technical": {
+    "architectureSummary": "Monorepo with two services. Frontend: Next.js 16.2.4 + React 19 + Tailwind v4, two views from one codebase (phone-styled victim UI + live admin dashboard). Backend: Express 5 + Prisma 7 + PostgreSQL, ESM module system.",
+
+    "stack": {
+      "frontend": ["Next.js 16.2.4", "React 19", "Tailwind CSS v4", "TypeScript"],
+      "backend": ["Express 5", "Prisma 7", "PostgreSQL", "TypeScript", "ESM"],
+      "ai": ["Claude Sonnet 4.6", "Vercel AI SDK v6", "Agentic tool-calling loop"],
+      "network": ["Nokia Network-as-Code SDK v6", "CAMARA APIs (7 endpoints)"],
+      "email": ["Resend"],
+      "security": ["bcryptjs (resolve PIN hashing)", "crypto.randomBytes (trusted contact token)"],
+      "deployment": ["Vercel (frontend)", "Railway (backend + Postgres)"]
+    },
+
+    "camaraAPIs": {
+      "totalEndpoints": 5,
+      "note": "APIs selected for maximum signal value per call — cost-efficient by design. Number Verification (CIBA OAuth) and KYC Match are defined in the service layer but excluded from the demo path; the theft detection and location signals already provide sufficient scoring confidence.",
+      "categories": {
+        "theftDetection": [
+          {
+            "name": "SIM Swap Verification",
+            "function": "verifySimSwap / getSimSwapDate",
+            "role": "Primary theft trigger — confirms SIM was changed and returns timestamp",
+            "calledIn": ["triggerTheft"]
+          },
+          {
+            "name": "Device Swap Verification",
+            "function": "verifyDeviceSwap / getDeviceSwapDate",
+            "role": "Secondary verification — detects a new SIM inserted into Kemi's IMEI",
+            "calledIn": ["triggerTheft"]
+          },
+          {
+            "name": "Device Status / Connectivity",
+            "function": "getConnectivity",
+            "role": "Confirms device is reachable on network — combined with swap = theft signal",
+            "calledIn": ["triggerTheft", "recovery agent — checkDeviceReachability tool"]
+          },
+          {
+            "name": "Device Status Subscription (push)",
+            "function": "client.deviceStatus.subscribe (CONNECTIVITY_DISCONNECTED)",
+            "role": "Nokia fires a webhook the moment the device drops off network — Sankofa shifts to finance-only mode and cleans up the subscription",
+            "calledIn": ["triggerTheft (MEDIUM/HIGH)", "deviceOfflineWebhook handler"]
+          }
+        ],
+        "locationIntelligence": [
+          {
+            "name": "Location Retrieval",
+            "function": "getLocation",
+            "role": "Cell-tower triangulation — tracks device position (300m–2km accuracy) while connected",
+            "calledIn": ["triggerTheft", "recovery agent — getDeviceLocation tool"]
+          }
+        ]
+      }
+    },
+
+    "agenticAI": {
+      "model": "Claude Sonnet 4.6",
+      "framework": "Vercel AI SDK v6 — generateText with tool-calling",
+      "approach": "Agentic recovery loop with up to 12 reasoning steps",
+      "tools": [
+        "checkDeviceReachability — re-checks Nokia NaC connectivity in real time",
+        "getDeviceLocation — pulls live CAMARA location during investigation",
+        "describeLocation — translates coordinates to plain Lagos landmarks (no hallucinated addresses)",
+        "freezeWallet — fires the MoMo freeze signal",
+        "sendOwnerAlert — composes and sends owner email via Resend",
+        "sendTrustedContactAlert — composes and sends trusted contact email with optional confirm link",
+        "blacklistDevice — registers IMEI in Sankofa's stolen device registry",
+        "checkOwnerResolved — polls for owner/trusted contact resolution to stop the loop"
+      ],
+      "keyProperty": "Explainable — the dashboard shows the full AI reasoning chain so judges, investigators, and Kemi herself understand exactly why the system decided what it decided. No black box.",
+      "fallback": "Rule-based fallback when AI key unavailable — ensures demo always works"
+    },
+
+    "securityModel": {
+      "tieredResolution": {
+        "LOW": "Auto-resolves. Low confidence, no financial action taken.",
+        "MEDIUM": "Owner must enter their 6-digit resolve PIN (bcrypt-hashed, set at registration, never stored on device). From any browser.",
+        "HIGH": "Only the trusted contact's one-time token link resolves the event. Token sent exclusively to the trusted contact's email. Even the thief with the unlocked phone and Kemi's email open cannot forge it — the token lives only in the trusted contact's inbox."
+      },
+      "whyThisMatters": "The critical gap in all prior systems: a thief with an unlocked phone can open Gmail and click 'This was me — undo'. Sankofa's tiered resolution means the very thing that makes HIGH-confidence theft protection strongest is also immune to the most sophisticated attacker scenario."
+    },
+
+    "onboarding": {
+      "steps": [
+        "Your details — name, email, phone number",
+        "Your device — IMEI (15-digit, validated; *#06# hint)",
+        "Home area — browser geolocation + Nominatim reverse geocoding; production uses CAMARA Roaming API (getRoaming + getLocation) for network-native home zone detection",
+        "Safety net — trusted contact name and email",
+        "Resolve PIN — 6-digit PIN set by user, bcrypt-hashed server-side"
+      ],
+      "networkNativePath": "In production (inside a carrier), CAMARA's Roaming API detects when the device returns to the home network (ROAMING_OFF event) and automatically records the cell-tower location as the home zone. No user input required."
+    }
+  },
+
+  "demo": {
+    "format": "Split-screen: phone-styled victim view (left) + live admin dashboard (right)",
+    "flow": [
+      {
+        "phase": "Setup",
+        "description": "Pre-filled Kemi registration card on the dashboard. Phone shows idle Sankofa home screen.",
+        "action": "Click 'Activate Sankofa protection'"
+      },
+      {
+        "phase": "Incident",
+        "description": "Live dashboard in monitoring mode.",
+        "action": "Click 'Simulate snatching' — fires POST /theft/trigger with Kemi's IMEI"
+      },
+      {
+        "phase": "Detection",
+        "description": "CAMARA SIM swap and device swap API calls fire in parallel. Results appear on dashboard timeline in real time.",
+        "visible": "CAMARA_SIM_SWAP and CAMARA_DEVICE_SWAP log entries with timestamps"
+      },
+      {
+        "phase": "AI Scoring",
+        "description": "Claude Sonnet 4.6 receives all signals and reasons about them. Confidence score (0–1) and plain-English reasoning appear on the dashboard.",
+        "visible": "Score, tier badge (HIGH/MEDIUM/LOW), full reasoning text"
+      },
+      {
+        "phase": "Response",
+        "description": "Recovery agent fires: wallet freeze, location tracking, email alerts to owner and trusted contact.",
+        "visible": "LOCKDOWN, EMAIL_ALERT, TRACKING_STARTED log entries. Phone preview shows alert state."
+      },
+      {
+        "phase": "Live Location",
+        "description": "CAMARA location pings show device moving on the timeline with coordinates.",
+        "visible": "LOCATION_PING entries with lat/lng and accuracy"
+      },
+      {
+        "phase": "Device Goes Offline",
+        "description": "CAMARA device-offline webhook fires. Tracking ends. Finance-only mode activates.",
+        "visible": "DEVICE_OFFLINE entry. Tracking subscription cleaned up."
+      },
+      {
+        "phase": "Resolution",
+        "description": "If false alarm: MEDIUM → owner enters PIN from any browser and resolves instantly. HIGH → trusted contact clicks confirm link in their email.",
+        "visible": "RESOLVED entry. Wallet unfrozen. IMEI flag cleared."
+      }
+    ],
+    "demoEmails": "Real emails sent to real inboxes via Resend during the demo — judges can see the actual email in their browser."
+  },
+
+  "whatsNext": {
+    "immediatePriority": [
+      {
+        "item": "Real mobile money integration",
+        "detail": "Commercial API agreements with Opay, MTN MoMo, M-Pesa. The freeze signal is live — the endpoint needs to be a real provider, not a mock.",
+        "dependency": "Fintech partnership (independent of MNO)"
+      },
+      {
+        "item": "GSMA international IMEI database submission",
+        "detail": "Nigerian carriers already check the GSMA IMEI database. Submitting stolen IMEIs to it triggers real blacklisting across all participating carriers globally. No MNO partnership required — Sankofa applies directly to GSMA.",
+        "dependency": "GSMA registration"
+      }
+    ],
+
+    "mnoPartnerships": {
+      "context": "Every capability below uses infrastructure that already exists inside every major carrier. Sankofa provides the product layer. What is missing is access, not invention.",
+      "tier1": [
+        {
+          "capability": "EIR (Equipment Identity Register) writes",
+          "what": "The carrier's internal blacklist checked every time a device registers on a tower. Adding a stolen IMEI to the Black list means no SIM — new, old, or stolen — can activate that device on that network.",
+          "unlocks": "Real network block. Factory reset, new SIM, doesn't matter. The device is dead.",
+          "path": "Direct MNO API agreement or Nokia proprietary NaC extension outside CAMARA standard"
+        },
+        {
+          "capability": "IMEI grey-listing — new SIM notification",
+          "what": "Carrier places stolen IMEI on the Grey list. The next time it registers on any tower with any SIM, the carrier fires a notification with the thief's new phone number.",
+          "unlocks": "The thief just handed us their identity. Tracking resumes on the new number. SIM swap becomes a reacquisition event, not a dead end.",
+          "path": "Direct MNO agreement. Nigerian carriers do this for law enforcement with court orders — Sankofa needs a commercial equivalent."
+        },
+        {
+          "capability": "Cross-carrier IMEI blacklist federation",
+          "what": "Shared blacklist across MTN, Airtel, Glo, and 9mobile. Device blocked on one cannot activate on another.",
+          "unlocks": "Nationally worthless device. No Nigerian carrier will activate it.",
+          "path": "NCC (Nigerian Communications Commission) already mandates IMEI registration. Integrate with NCC's stolen device reporting API."
+        },
+        {
+          "capability": "Carrier-grade hybrid location",
+          "what": "Cell towers + WiFi positioning + GPS assist. Carriers have this; CAMARA exposes cell-tower only.",
+          "unlocks": "10–50 metre accuracy instead of 300m–2km. Difference between 'near Oshodi' and 'outside 14 Ladipo Street.'",
+          "path": "Direct carrier location API agreement or third-party carrier location platform"
+        }
+      ],
+      "tier2": [
+        {
+          "capability": "Pre-emptive SIM swap interception",
+          "what": "Carrier intercepts the swap request before it completes and fires a real-time event. Sankofa challenges the swap — requires owner confirmation before the SIM changes hands.",
+          "unlocks": "Zero-window theft. The swap cannot complete without owner consent.",
+          "path": "Deep carrier integration — Sankofa must be in the swap processing chain"
+        },
+        {
+          "capability": "eSIM remote profile disable",
+          "what": "GSMA SGP.22 allows carriers to remotely disable eSIM profiles. Factory reset no longer defeats Sankofa — the hardware exists but the carrier refuses to re-provision.",
+          "unlocks": "For iPhone 14+, Pixel 7+, Galaxy flagships — permanent deactivation even after reset.",
+          "path": "eSIM Remote SIM Provisioning agreement with carrier. Nokia has deep expertise here."
+        },
+        {
+          "capability": "OTA device lock command",
+          "what": "OMA DM (Open Mobile Alliance Device Management) allows carriers to push lock commands over the air without a locally installed app.",
+          "unlocks": "Carrier tells the device to lock. No app, no root access required.",
+          "path": "OMA DM integration with carrier. Samsung Knox and enterprise MDM platforms do this today."
+        }
+      ],
+      "tier3Financial": [
+        {
+          "capability": "Direct mobile money API freeze (Opay, MTN MoMo, M-Pesa)",
+          "what": "Commercial agreement with each MoMo provider's fraud API. Currently mocked for demo.",
+          "unlocks": "Actual wallet protection for the 400M mobile money users in SSA.",
+          "path": "Fintech partnership agreements — independent of MNO track"
+        },
+        {
+          "capability": "Bank OTP blocking via BVN linkage",
+          "what": "In Nigeria, phone numbers link to BVN which links to bank accounts. Alert the bank pre-emptively to flag OTP requests from the stolen number.",
+          "unlocks": "Even if the thief keeps the SIM active long enough for OTPs, the bank is pre-warned.",
+          "path": "CBN fraud reporting framework. Partnership with NIBSS (Nigeria Inter-Bank Settlement System)."
+        }
+      ]
+    },
+
+    "productRoadmap": {
+      "now": [
+        "Nokia CAMARA sandbox — 7 API endpoints live",
+        "Agentic AI theft scoring with Claude Sonnet 4.6",
+        "Tiered resolution security (PIN + trusted contact token)",
+        "CAMARA device-offline push subscription",
+        "Sankofa IMEI stolen device registry",
+        "Real transactional email alerts via Resend",
+        "Full demo: setup → incident → AI score → response → resolve"
+      ],
+      "next90Days": [
+        "GSMA IMEI database integration (real cross-carrier flag)",
+        "Opay and MTN MoMo commercial API integration (real wallet freeze)",
+        "Pilot with one Nigerian carrier (MNO partnership Tier 1)",
+        "iOS and Android push notification channel (complement email)"
+      ],
+      "next12Months": [
+        "EIR write capability with first MNO partner",
+        "IMEI grey-listing / new-SIM notification",
+        "B2B licensing to banks and MoMo providers (theft signal as a service)",
+        "Expansion: Ghana (MTN, AirtelTigo), Kenya (Safaricom), Rwanda (MTN)"
+      ]
+    }
+  },
+
+  "businessModel": {
+    "oneSentence": "Banks and MoMo providers save more in fraud prevention than Sankofa charges — the incentives align perfectly.",
+    "channels": [
+      {
+        "channel": "B2C Freemium",
+        "description": "Basic protection free. Premium tier: family plans, device insurance integration, multi-device coverage.",
+        "target": "Individual consumers in SSA"
+      },
+      {
+        "channel": "B2B Licensing",
+        "description": "Banks and MoMo providers pay for real-time theft signals. A freeze signal 60 seconds after theft prevents account draining — worth far more than the license fee.",
+        "target": "Opay, MTN MoMo, M-Pesa, Access Bank, GTBank"
+      },
+      {
+        "channel": "MNO Revenue Share",
+        "description": "Stolen device registry licensed to telcos. Per-IMEI check fee. Carrier becomes a distribution partner.",
+        "target": "MTN Nigeria, Airtel Nigeria, Glo, Safaricom"
+      }
+    ],
+    "marketSize": {
+      "mobileMoneyTransactions": "$1.26 trillion processed through mobile money in Africa (2023, GSMA)",
+      "phoneTheftLoss": "Mobile money fraud in SSA: hundreds of millions USD annually, largely driven by SIM-swap and stolen-device attacks",
+      "addressableUsers": "400 million active mobile money accounts in Sub-Saharan Africa"
+    }
+  },
+
+  "whySankofaWins": {
+    "againstAppBasedSolutions": "A factory reset defeats every app-based solution in 90 seconds. Sankofa lives in the network — there is no app to reset.",
+    "againstManualProcesses": "Manual carrier calls take 30–60 minutes. Sankofa acts in 60 seconds.",
+    "againstGenericFraudTools": "Generic fraud tools are reactive and device-agnostic. Sankofa is proactive, network-native, and built specifically for the SIM-swap + mobile money attack vector that defines SSA phone theft.",
+    "uniqueInsight": "The phone is the least valuable thing the thief steals. The dangerous part is what they can do with it. Protecting the financial identity is the problem worth solving. No one else has built it this way."
+  },
+
+  "team": {
+    "members": [
+      {
+        "name": "Isaac Onyemaechi",
+        "role": "Founder & Solo Builder",
+        "background": "Full-stack engineer. Built the entire Sankofa stack solo during the prototype phase: Nokia CAMARA integration, agentic AI engine, tiered security model, frontend onboarding and demo flows, backend API.",
+        "contact": "amaechiisaac450@gmail.com"
+      }
+    ],
+    "openSlot": {
+      "role": "Cybersecurity / Telecom",
+      "description": "One team slot open. Ideal candidate: telco security background, SIM swap forensics, or mobile fraud experience. The MNO partnership conversations will be stronger with telecom-native expertise.",
+      "seeking": true
+    },
+    "advisoryConnection": "Had a direct technical review session with Nokia's Network-as-Code team during development. Their feedback shaped the architecture — specifically: device reachability subscriptions, the CAMARA Roaming API for home zone detection, and the honesty around EIR limitations."
+  },
+
+  "judgesNotes": {
+    "technicalDepth": "5 CAMARA API endpoints consumed, selected for maximum signal value per call. Most teams wire 2–3 and stop at polling. Sankofa adds a push subscription layer (CONNECTIVITY_DISCONNECTED webhook) that fires when the device drops off the network — an event-driven pattern most hackathon submissions will not implement. APIs not in the demo path were deliberately excluded for cost efficiency.",
+    "aiDifferentiator": "The AI is not a chatbot. It is an agentic recovery loop with 8 tools that reasons about signals, describes locations in plain Lagos-relevant language (no hallucinated street addresses), and produces an explainable score visible on the admin dashboard.",
+    "securityThought": "The tiered resolution model is a non-obvious security insight: HIGH-confidence theft protection is specifically designed to be unbreakable even if the thief has the unlocked phone and access to the victim's email. The trusted contact confirm chain is the answer.",
+    "honesty": "Where CAMARA does not expose a capability today (EIR writes, grey-listing), Sankofa's documentation says so clearly and names the partnership path. Judges who dig in will find honesty, not vaporware.",
+    "networkNativeInsight": "Sankofa is not an app. There is nothing to factory-reset. This is the structural insight that makes it different from every consumer solution on the market today."
+  }
+}

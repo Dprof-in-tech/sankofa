@@ -30,6 +30,7 @@ model User {
   homeRadiusKm        Float    @default(5.0)
   trustedContactName  String?
   trustedContactEmail String?
+  resolvePinHash      String?
   walletFrozen        Boolean  @default(false)
   createdAt           DateTime @default(now())
 
@@ -60,12 +61,14 @@ model TheftEvent {
   id        String       @id @default(cuid())
   deviceId  String
   userId    String
-  trigger   TriggerType
-  aiScore   Float
-  tier      ResponseTier
-  reasoning String
-  resolved  Boolean      @default(false)
-  createdAt DateTime     @default(now())
+  trigger              TriggerType
+  aiScore              Float
+  tier                 ResponseTier
+  reasoning            String
+  resolved             Boolean      @default(false)
+  resolveToken         String?      @unique
+  camaraSubscriptionId String?
+  createdAt            DateTime     @default(now())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   device Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)

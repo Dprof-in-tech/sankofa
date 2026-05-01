@@ -1,23 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
 import { AdminConsole } from "@/components/AdminConsole";
-import { PhoneView, type PhoneState } from "@/components/PhoneView";
-import { api, type ActivityItem, type Device, type TheftEvent, type User } from "@/lib/api";
+import { PhoneView } from "@/components/PhoneView";
+import { useDemoOrchestrator } from "@/lib/use-demo-orchestrator";
 
 export default function DemoPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [device, setDevice] = useState<Device | null>(null);
-  const [events, setEvents] = useState<TheftEvent[]>([]);
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [phoneState, setPhoneState] = useState<PhoneState>("idle");
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [demoEmail, setDemoEmail] = useState("");
-  const lockedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const {
+    phase, user, device, activity,
+    phoneState, working, error, demoEmail, latestEvent,
+    setDemoEmail, onActivate, onSimulate, onReset, onReportStolen, onRegisterSale,
+  } = useDemoOrchestrator();
 
-  const latestEvent = events[0] ?? null;
+  const activeTheftEvent = latestEvent && !latestEvent.resolved ? latestEvent : null;
+
   const latestLocation =
     (latestEvent?.id &&
       (activity.find((a) => a.kind === "THEFT_TRIGGER")?.meta as
@@ -26,121 +22,79 @@ export default function DemoPage() {
         ?.location) ||
     null;
 
-  const refresh = useCallback(async () => {
-    try {
-      const [state, evs, act] = await Promise.all([
-        api.demoState(),
-        api.listEvents(),
-        api.listActivity(),
-      ]);
-      setUser(state.user);
-      setDevice(state.device);
-      setEvents(evs);
-      setActivity(act);
-      setError(null);
+  if (phase === "setup" || phase === "activating") {
+    return (
+      <main className="flex-1 flex flex-col">
+        <nav className="px-8 sm:px-12 pt-8 flex items-center justify-between">
+          <Link
+            href="/"
+            className="font-mono text-[11px] tracking-[0.2em] uppercase text-soft hover:text-ink transition-colors"
+          >
+            ← Sankofa
+          </Link>
+          <span className="font-mono text-[11px] tracking-[0.2em] uppercase text-soft">
+            Live demo
+          </span>
+        </nav>
 
-      // Reflect backend state in the phone view at load time and on each poll.
-      if (evs.length === 0) {
-        setPhoneState("idle");
-      } else if (evs[0].tier === "HIGH") {
-        setPhoneState("locked");
-      } else if (evs[0].tier === "MEDIUM") {
-        setPhoneState("alerting");
-      } else {
-        setPhoneState("idle");
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not reach the backend.");
-    }
-  }, []);
+        <section className="flex-1 px-8 sm:px-12 py-12 flex items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-20 items-center w-full max-w-5xl mx-auto">
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+            <div className="w-full max-w-md mx-auto lg:mx-0">
+              <p className="font-mono text-[11px] tracking-[0.2em] uppercase text-soft mb-3">
+                Registration
+              </p>
+              <h2 className="text-3xl font-medium tracking-tight text-ink mb-2">
+                Meet Kemi.
+              </h2>
+              <p className="text-[15px] text-muted leading-relaxed mb-8">
+                She&apos;s about to cross Third Mainland Bridge at 7pm. Before that,
+                she registered her phone with Sankofa. Here&apos;s what that looks like.
+              </p>
 
-  // While a theft event is open, poll every 5s so judges see location pings
-  // and movement emails land on the timeline in near-real time. Stops once
-  // the latest event is resolved (owner clicked undo in the email).
-  useEffect(() => {
-    if (!latestEvent || latestEvent.resolved) return;
-    const id = setInterval(() => {
-      refresh();
-    }, 5_000);
-    return () => clearInterval(id);
-  }, [latestEvent, refresh]);
+              <div className="rounded-2xl border border-hairline bg-card divide-y divide-hairline mb-6">
+                <RegRow label="Name" value={user?.name ?? "Kemi Adeyemi"} />
+                <RegRow label="Phone" value={user?.phoneE164 ?? "+99999991000"} mono />
+                <RegRow
+                  label="IMEI"
+                  value={(() => {
+                    const imei = device?.imei ?? "867530999123456";
+                    return `${imei.slice(0, 2)} ${imei.slice(2, 8)} ******* ${imei.slice(-1)}`;
+                  })()}
+                  mono
+                />
+                <RegRow label="Trusted contact" value="Tunde (husband)" />
+                <RegRow label="Resolve PIN" value="●●●●●●" mono />
+              </div>
 
-  const onSimulate = useCallback(async () => {
-    if (!device || working) return;
-    setWorking(true);
-    setPhoneState("alerting");
-    try {
-      const result = await api.triggerTheft(device.imei, "SIM_SWAP", demoEmail || undefined);
-      // Let the phone sit in "alerting" briefly so the transition feels real.
-      if (lockedTimer.current) clearTimeout(lockedTimer.current);
-      lockedTimer.current = setTimeout(() => {
-        setPhoneState(result.score.tier === "HIGH" ? "locked" : result.score.tier === "MEDIUM" ? "alerting" : "idle");
-      }, 1800);
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong.");
-      setPhoneState("idle");
-    } finally {
-      setWorking(false);
-    }
-  }, [device, working, refresh]);
+              <div className="mb-8 rounded-xl border border-hairline bg-paper px-5 py-4 text-[13px] text-muted leading-relaxed">
+                <p className="font-mono text-[10px] tracking-[0.2em] uppercase text-soft mb-2">
+                  What happens now
+                </p>
+                Sankofa registers Kemi&apos;s IMEI at the carrier level and starts
+                watching for SIM swaps, device swaps, and connectivity changes on her
+                line — all via Nokia&apos;s CAMARA APIs. No app installed. Nothing on
+                the device.
+              </div>
 
-  const onReset = useCallback(async () => {
-    if (working) return;
-    setWorking(true);
-    try {
-      await api.resetDemo();
-      if (lockedTimer.current) clearTimeout(lockedTimer.current);
-      setPhoneState("idle");
-      setDemoEmail("");
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Reset failed.");
-    } finally {
-      setWorking(false);
-    }
-  }, [working, refresh]);
+              <button
+                onClick={onActivate}
+                disabled={phase === "activating"}
+                className="h-14 w-full rounded-full bg-ink text-paper font-medium text-base hover:opacity-85 transition-opacity disabled:opacity-60"
+              >
+                {phase === "activating" ? "Activating protection…" : "Activate protection →"}
+              </button>
+            </div>
 
-  // MANUAL trigger — Kemi realizes her phone is gone and hits a panic button
-  // from any browser. Same pipeline as SIM_SWAP but the AI weighs the fact
-  // that the owner self-reported, not the network.
-  const onReportStolen = useCallback(async () => {
-    if (!device || working) return;
-    setWorking(true);
-    setPhoneState("alerting");
-    try {
-      const result = await api.triggerTheft(device.imei, "MANUAL", demoEmail || undefined);
-      if (lockedTimer.current) clearTimeout(lockedTimer.current);
-      lockedTimer.current = setTimeout(() => {
-        setPhoneState(result.score.tier === "HIGH" ? "locked" : result.score.tier === "MEDIUM" ? "alerting" : "idle");
-      }, 1800);
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Report failed.");
-      setPhoneState("idle");
-    } finally {
-      setWorking(false);
-    }
-  }, [device, working, refresh]);
+            <div className="hidden lg:flex justify-center">
+              <SetupPhonePreview activating={phase === "activating"} />
+            </div>
 
-  const onRegisterSale = useCallback(async () => {
-    if (!device || working) return;
-    setWorking(true);
-    try {
-      await api.markAsSold(device.imei);
-      await refresh();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Register sale failed.");
-    } finally {
-      setWorking(false);
-    }
-  }, [device, working, refresh]);
-
-  const activeTheftEvent = latestEvent && !latestEvent.resolved ? latestEvent : null;
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="flex-1 flex flex-col">
@@ -194,9 +148,8 @@ export default function DemoPage() {
             Watch both sides of the theft, in real time.
           </h1>
           <p className="mt-3 text-[15px] text-muted leading-relaxed">
-            On the left is Kemi&apos;s phone. On the right is the Sankofa console that
-            a carrier operator would see. Press <span className="text-ink">Simulate theft</span> to
-            trigger the real CAMARA pipeline.
+            Left is Kemi&apos;s phone. Right is the Sankofa console a carrier operator would see.
+            Press <span className="text-ink">Simulate theft</span> to trigger the real CAMARA pipeline.
           </p>
           <div className="mt-5 grid grid-cols-2 gap-3 max-w-lg">
             <div className="rounded-xl border border-hairline bg-card px-4 py-3">
@@ -239,7 +192,7 @@ export default function DemoPage() {
           <div className="flex justify-center py-10">
             <PhoneView user={user} event={latestEvent} state={phoneState} />
           </div>
-          <div className="min-h-[640px]">
+          <div className="min-h-160">
             <AdminConsole
               user={user}
               device={device}
@@ -252,5 +205,81 @@ export default function DemoPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+// ─── Setup phase phone preview ───────────────────────────────────────────────
+
+function SetupPhonePreview({ activating }: { activating: boolean }) {
+  const time = new Date().toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  return (
+    <div className="relative mx-auto w-full max-w-[320px] select-none">
+      <div className="relative rounded-[42px] bg-neutral-900 p-2 shadow-[0_40px_80px_-40px_rgba(0,0,0,0.35)]">
+        <div className="rounded-[36px] bg-paper overflow-hidden">
+          <div className="flex items-center justify-between px-6 pt-4 pb-2 text-[11px] font-mono tracking-wider text-ink">
+            <span>{time}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-1 w-1 rounded-full bg-ink" />
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-ink" />
+              <span className="inline-block h-2 w-2 rounded-full bg-ink" />
+              <span className="ml-1">MTN</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center justify-center px-6 pb-10 pt-4 min-h-120 text-center gap-5">
+            {activating ? (
+              <>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-warn-bg px-3 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-warn-ink" />
+                  <span className="font-mono text-[10px] tracking-widest uppercase text-warn-ink">
+                    Activating
+                  </span>
+                </div>
+                <div className="flex items-end gap-2 h-6">
+                  <span className="sankofa-dot inline-block h-2 w-2 rounded-full bg-ink" style={{ animationDelay: "0s" }} />
+                  <span className="sankofa-dot inline-block h-2 w-2 rounded-full bg-ink" style={{ animationDelay: "0.2s" }} />
+                  <span className="sankofa-dot inline-block h-2 w-2 rounded-full bg-ink" style={{ animationDelay: "0.4s" }} />
+                </div>
+                <p className="text-xs text-soft leading-relaxed max-w-48">
+                  Registering IMEI with the carrier network…
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-card border border-hairline px-3 py-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-hairline" />
+                  <span className="text-[11px] text-soft">Not yet protected</span>
+                </div>
+                <p className="text-2xl font-light text-ink">Kemi&apos;s phone</p>
+                <p className="text-xs text-soft leading-relaxed max-w-48">
+                  Activate protection to register this device at the carrier level.
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 text-center font-mono text-[10px] tracking-[0.2em] uppercase text-soft">
+        Kemi&apos;s phone
+      </div>
+    </div>
+  );
+}
+
+// ─── Shared ──────────────────────────────────────────────────────────────────
+
+function RegRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between px-5 py-3 gap-4">
+      <span className="text-[13px] text-soft shrink-0">{label}</span>
+      <span className={`text-[13px] text-ink text-right ${mono ? "font-mono" : ""}`}>
+        {value}
+      </span>
+    </div>
   );
 }
