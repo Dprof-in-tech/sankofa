@@ -51,14 +51,19 @@ Every part of the pipeline is visible on the admin console in real time.
 sankofa/
 ├── frontend/        Next.js 16.2.4 + React 19 + Tailwind v4
 │                    Two views from one codebase:
-│                      · phone-styled user UI (victim's POV)
-│                      · live admin dashboard (judges' POV)
-│                      · /how-it-works explainer
+│                      · /onboard              — register Kemi (home zone, trusted contact, PIN)
+│                      · /demo                 — split screen: phone view + admin console
+│                      · /how-it-works         — 60-second journey explainer
+│                      · /                     — landing page
 ├── backend/         Express 5 + Prisma 7 + Postgres (ESM)
-│                    src/services/camara.ts           — CAMARA API calls
-│                    src/services/ai.ts               — agentic decision engine
+│                    src/agents/recovery-agent.ts     — Claude tool-use loop (8 tools)
+│                    src/services/camara.ts           — all 7 CAMARA API calls
+│                    src/services/ai.ts               — theft confidence scorer (Claude)
+│                    src/services/signals.ts          — multi-signal context builder
 │                    src/services/email.ts            — Resend transactional email
 │                    src/services/location-tracker.ts — continuous post-theft tracking
+│                    src/services/recovery-actions.ts — freeze + blacklist helpers
+│                    src/services/resolve-protocol.ts — PIN / trusted-contact resolution
 │                    src/controllers/                 — theft / webhook / demo
 ├── vercel.json      experimentalServices: web (/) + api (/api)
 └── package.json     concurrently runs both in dev
@@ -68,10 +73,10 @@ sankofa/
 
 | Service | Role |
 |---|---|
-| **Nokia Network-as-Code (CAMARA)** | SIM Swap, Device Swap, Location Retrieval, Device Reachability |
-| **Vercel AI Gateway → Claude Sonnet 4.6** | Explainable theft confidence scoring |
+| **Nokia Network-as-Code (CAMARA)** | SIM Swap, Device Swap, Device Status, Location Retrieval, Device Reachability, Number Verification, KYC Match |
+| **Vercel AI Gateway → Claude Sonnet 4.6** | Theft confidence scoring + autonomous recovery agent |
 | **Resend** | Transactional email (owner + trusted contact) |
-| **Postgres** (Neon / Vercel Postgres / local) | Users, devices, events, activity log |
+| **Postgres** (Vercel Postgres / Neon / local) | Users, devices, events, activity log |
 
 ---
 
@@ -102,6 +107,16 @@ Copy `.env.example` to `.env` at the repo root and fill in the keys.
 cp .env.example .env
 # then edit .env
 ```
+
+Key variables:
+
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | Postgres connection string |
+| `NAC_TOKEN` | Nokia Network-as-Code application key |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key (Claude Sonnet 4.6) |
+| `RESEND_API_KEY` | Transactional email |
+| `MOCK_BANK_URL` | URL of the `/mock-bank/freeze` endpoint. **Required in production** — set to your deployed backend URL + `/mock-bank/freeze` (e.g. `https://your-backend.vercel.app/api/mock-bank/freeze`). Defaults to `localhost` in dev. |
 
 ### Push schema + seed
 
